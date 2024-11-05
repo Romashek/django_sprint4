@@ -3,26 +3,21 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.views.generic import (
     CreateView, DeleteView, DetailView, ListView, UpdateView
 )
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.core.paginator import Paginator
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth import get_user_model
 from django.views import View
 from django.http import Http404
+from django.conf import settings
 
 # Локальные импорты
 from .forms import PostForm, CommentForm
 from .models import Post, Category, Comment
+from .mixins import OnlyAuthorMixin
 
 
 User = get_user_model()
-
-
-class OnlyAuthorMixin(UserPassesTestMixin):
-
-    def test_func(self):
-        object = self.get_object()
-        return object.author == self.request.user
 
 
 def get_published_posts():
@@ -32,10 +27,14 @@ def get_published_posts():
         category__is_published=True
     )
 
+def paginate_func(queryset, request, items_per_page=settings.PAGINATE_BY):
+    paginator = Paginator(queryset, items_per_page)
+    page_number = request.GET.get('page')
+    return paginator.get_page(page_number)
 
 class IndexListView(ListView):
     ordering = 'id'
-    paginate_by = 10
+    paginate_by = settings.PAGINATE_BY
     template_name = 'blog/index.html'
 
     def get_queryset(self):
@@ -50,7 +49,7 @@ def post_detail(request, post_id):
         if (not post.is_published
                 or post.pub_date > timezone.now()
                 or not post.category.is_published):
-            raise Http404("You do not have permission to view this post.")
+            raise Http404('You do not have permission to view this post.')
 
     if request.method == 'POST':
         form = CommentForm(request.POST)
@@ -94,12 +93,8 @@ def category_posts(request, category_slug):
     context = {
         'category': category,
         'post_list': post_list,
+        'page_obj': paginate_func(post_list, request)
     }
-
-    paginator = Paginator(post_list, 10)
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    context['page_obj'] = page_obj
 
     return render(request, 'blog/category.html', context)
 
@@ -115,32 +110,25 @@ class PostCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         username = self.request.user.username
-        return reverse_lazy('blog:profile', kwargs={'username': username})
+        return reverse('blog:profile', kwargs={'username': username})
 
 
 class ProfileView(DetailView):
     model = User
     template_name = 'blog/profile.html'
     context_object_name = 'profile'
-    paginate_by = 10
+    paginate_by = settings.PAGINATE_BY
 
     def get_object(self, queryset=None):
-        # Получаем объект пользователя по username из URL
         username = self.kwargs.get('username')
         return get_object_or_404(User, username=username)
 
     def get_context_data(self, **kwargs):
-        # Получаем контекст и добавляем список постов автора
         context = super().get_context_data(**kwargs)
 
-        # Получаем все посты автора (как опубликованные, так и отложенные)
-        post_list = Post.objects.filter(author=self.object)
+        post_list = self.object.posts.all()
 
-        paginator = Paginator(post_list, self.paginate_by)
-        page_number = self.request.GET.get('page')
-        page_obj = paginator.get_page(page_number)
-
-        context['page_obj'] = page_obj
+        context['page_obj'] = paginate_func(post_list, self.request)
 
         return context
 
@@ -155,7 +143,7 @@ class EditProfileView(LoginRequiredMixin, UpdateView):
 
     def get_success_url(self):
         username = self.object.username
-        return reverse_lazy('blog:profile', kwargs={'username': username})
+        return reverse('blog:profile', kwargs={'username': username})
 
 
 class PostUpdateView(LoginRequiredMixin, OnlyAuthorMixin, UpdateView):
@@ -164,7 +152,7 @@ class PostUpdateView(LoginRequiredMixin, OnlyAuthorMixin, UpdateView):
     template_name = 'blog/create.html'
 
     def get_success_url(self):
-        return reverse_lazy(
+        return reverse(
             'blog:profile',
             kwargs={'username': self.object.author.username}
         )
@@ -229,7 +217,7 @@ class EditCommentView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     template_name = 'blog/comment.html'
 
     def get_success_url(self):
-        return reverse_lazy(
+        return reverse(
             'blog:post_detail',
             kwargs={'post_id': self.object.post.id}
         )
@@ -249,7 +237,7 @@ class DeleteCommentView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     template_name = 'blog/comment.html'
 
     def get_success_url(self):
-        return reverse_lazy(
+        return reverse(
             'blog:post_detail',
             kwargs={'post_id': self.object.post.id}
         )

@@ -30,6 +30,7 @@ class Post(PublishedModel):
     author = models.ForeignKey(User,
                                on_delete=models.CASCADE,
                                blank=False,
+                               related_name='posts',
                                verbose_name="Автор публикации")
     location = models.ForeignKey("Location",
                                  on_delete=models.SET_NULL,

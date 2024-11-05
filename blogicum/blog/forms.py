@@ -1,6 +1,7 @@
 from django import forms
-from .models import Post
-from .models import Comment
+from django.utils import timezone
+
+from .models import Post, Comment
 
 
 class CommentForm(forms.ModelForm):
@@ -15,5 +16,8 @@ class PostForm(forms.ModelForm):
         model = Post
         exclude = ('author', 'is_published', 'location')
         widgets = {
-            'pub_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'pub_date': forms.DateTimeInput(attrs={
+                'type': 'datetime-local',
+                'value': timezone.now().strftime('%Y-%m-%dT%H:%M')
+                }),
         }
