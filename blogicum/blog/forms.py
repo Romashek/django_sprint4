@@ -18,6 +18,5 @@ class PostForm(forms.ModelForm):
         widgets = {
             'pub_date': forms.DateTimeInput(attrs={
                 'type': 'datetime-local',
-                'value': timezone.now().strftime('%Y-%m-%dT%H:%M')
-                }),
+                'value': timezone.now().strftime('%Y-%m-%dT%H:%M')}),
         }

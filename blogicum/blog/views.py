@@ -27,10 +27,12 @@ def get_published_posts():
         category__is_published=True
     )
 
+
 def paginate_func(queryset, request, items_per_page=settings.PAGINATE_BY):
     paginator = Paginator(queryset, items_per_page)
     page_number = request.GET.get('page')
     return paginator.get_page(page_number)
+
 
 class IndexListView(ListView):
     ordering = 'id'
